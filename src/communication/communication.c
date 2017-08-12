@@ -38,6 +38,10 @@
 #include <scheduler/process.h>
 #include <datatypes/list.h>
 #include <mm/dymelor.h>
+#ifdef HAS_MPI
+#include <communication/mpi.h>
+#endif
+
 
 /// This is the function pointer to correctly set ScheduleNewEvent API version, depending if we're running serially or parallelly
 void (* ScheduleNewEvent)(unsigned int gid_receiver, simtime_t timestamp, unsigned int event_type, void *event_content, unsigned int event_size);
@@ -52,17 +56,20 @@ void (* ScheduleNewEvent)(unsigned int gid_receiver, simtime_t timestamp, unsign
 * @author Roberto Vitali
 */
 void communication_init(void) {
-//	windows_init();
+	#ifdef HAS_MPI
+	inter_kernel_comm_init();
+	#endif
 }
 
 
 /**
-* This function finalizes the communication subsystem
-*
-* @author Roberto Vitali
-*
+* Finalizes the communication subsystem
 */
 void communication_fini(void) {
+	#ifdef HAS_MPI
+	inter_kernel_comm_finalize();
+	mpi_finalize();
+	#endif
 }
 
 
@@ -228,12 +235,14 @@ int comm_finalize(void) {
 * @author Francesco Quaglia
 */
 void Send(msg_t *msg) {
-	// Check whether the message recepient is local or remote
-	if(GidToKernel(msg->receiver) == kid) { // is local
-		insert_bottom_half(msg);
-	} else { // is remote
-		rootsim_error(true, "Calling an operation not yet reimplemented, this should never happen!\n", __FILE__, __LINE__);
+	#ifdef HAS_MPI
+	// Check whether the message recepient kernel is remote
+	if(GidToKernel(msg->receiver) != kid){
+		send_remote_msg(msg);
+		return;
 	}
+	#endif
+	insert_bottom_half(msg);
 }
 
 

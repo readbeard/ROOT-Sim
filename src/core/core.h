@@ -127,20 +127,29 @@
 
 typedef enum {positive, negative, other} message_kind_t;
 
+#ifdef HAS_MPI
+typedef unsigned char phase_colour;
+#endif
+
+/* The MPI datatype msg_mpi_t depends on the order of this struct. */
+
 /// Message Type definition
 typedef struct _msg_t {
 	// Kernel's information
 	unsigned int   		sender;
 	unsigned int   		receiver;
+#ifdef HAS_MPI
+	phase_colour	colour;
+#endif
 	int   			type;
+	message_kind_t		message_kind;
 	simtime_t		timestamp;
 	simtime_t		send_time;
-	message_kind_t		message_kind;
 	unsigned long long	mark;	/// Unique identifier of the message, used for antimessages
 	unsigned long long	rendezvous_mark;	/// Unique identifier of the message, used for rendez-vous events
 	// Application informations
-	char event_content[MAX_EVENT_SIZE];
 	int size;
+	char event_content[MAX_EVENT_SIZE];
 } msg_t;
 
 
