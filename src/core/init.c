@@ -48,6 +48,9 @@
 #include <statistics/statistics.h>
 #include <lib/numerical.h>
 #include <serial/serial.h>
+#ifdef HAS_MPI
+#include <communication/mpi.h>
+#endif
 
 
 /// This variable keeps the executable's name
@@ -303,6 +306,7 @@ static int parse_cmd_line(int argc, char **argv) {
 
 			case OPT_NO_CORE_BINDING:
 				rootsim_config.core_binding = false;
+				break;
 
 			#ifdef HAVE_PREEMPTION
 			case OPT_PREEMPTION:
@@ -358,7 +362,15 @@ static int parse_cmd_line(int argc, char **argv) {
 */
 void SystemInit(int argc, char **argv) {
 
+	#ifdef HAS_MPI
+	mpi_init(&argc, &argv);
+
+	if(n_ker > MAX_KERNELS){
+		rootsim_error(true, "Too many kernels, maximum supported number is %u\n", MAX_KERNELS);
+	}
+	#else
 	n_ker = 1;
+	#endif
 
 	register int w;
 
@@ -402,10 +414,14 @@ void SystemInit(int argc, char **argv) {
 		 printf("****************************\n"
 			"*  ROOT-Sim Configuration  *\n"
 			"****************************\n"
+			"Kernels: %u\n"
 			"Cores: %ld available, %d used\n"
 			"Number of Logical Processes: %u\n"
 			"Output Statistics Directory: %s\n"
 			"Scheduler: %d\n"
+			#ifdef HAS_MPI
+			"MPI multithread support: %s\n"
+			#endif
 			"GVT Time Period: %.2f seconds\n"
 			"Checkpointing Type: %d\n"
 			"Checkpointing Period: %d\n"
@@ -415,11 +431,15 @@ void SystemInit(int argc, char **argv) {
 			"Check Termination Mode: %d\n"
 			"Blocking GVT: %d\n"
 			"Set Seed: %ld\n",
+			n_ker,
 			get_cores(),
 			n_cores,
 			n_prc_tot,
 			rootsim_config.output_dir,
 			rootsim_config.scheduler,
+			#ifdef HAS_MPI
+			((mpi_support_multithread)? "yes":"no"),
+			#endif
 			rootsim_config.gvt_time_period / 1000.0,
 			rootsim_config.checkpointing,
 			rootsim_config.ckpt_period,
@@ -440,8 +460,8 @@ void SystemInit(int argc, char **argv) {
 	base_init();
 	statistics_init();
 	scheduler_init();
-	communication_init();
 	dymelor_init();
+	communication_init();
 	gvt_init();
 	numerical_init();
 
