@@ -5,6 +5,7 @@ AC_CONFIG_SRCDIR([src])
 AM_INIT_AUTOMAKE([-Wno-portability 1.10.1 -Wall foreign subdir-objects])
 
 AC_CONFIG_MACRO_DIR([m4])
+
 AC_USE_SYSTEM_EXTENSIONS
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
@@ -39,6 +40,27 @@ AS_IF([test "x$enable_profile" = "xyes"], [
 	CFLAGS="-pg $CFLAGS"
 ])
 
+
+AC_ARG_WITH([mpi],
+            AS_HELP_STRING([--with-mpi], [compile with MPI (parallelization) support. Default: no]),
+            [],
+            [with_mpi=no])
+
+AS_IF([test x"$with_mpi" != xno],[
+	# Find a suitable MPI compiler: from CC and MPICC var or autodiscovery
+	# Test the choosen compiler for MPI support.
+	AX_PROG_CC_MPI(,,[AC_MSG_FAILURE([Couldn't find any MPI compiler. Be sure that CC env variable is not set to an incompatible compiler])])
+	AC_DEFINE([HAS_MPI])
+	CFLAGS="$CFLAGS -DHAS_MPI"
+],[
+	# MPI was not requested, force gcc compiler
+	AC_PROG_CC([gcc])
+])
+
+# be sure to call this macro after the AX_PROG_CC_MPI cause it is implicitely
+# overwriting the CC envar
+AC_USE_SYSTEM_EXTENSIONS
+
 #----------------------------------------------------------------------------
 # Check for languages
 #----------------------------------------------------------------------------
@@ -49,7 +71,7 @@ AC_LANG([C])
 # Checks for programs.
 #----------------------------------------------------------------------------
 m4_pattern_allow([AM_PROG_AR])
-AC_PROG_CC([gcc])
+
 AC_PROG_MAKE_SET
 AC_PROG_MKDIR_P
 AC_PROG_CC_C_O
@@ -109,6 +131,20 @@ AC_SUBST([CFLAGS])
 AC_SUBST([CC])
 
 
+#----------------------------------------------------------------------------
+# Checks for doxygen, if asked to
+#----------------------------------------------------------------------------
+AC_ARG_WITH([doxygen],
+  [AS_HELP_STRING([--with-doxygen], [use doxygen to generate ROOT-Sim documentation.])],
+  [AC_CHECK_PROG([DOXYGEN], [doxygen], [doxygen])
+  case "$withval" in
+    yes) test -z "$DOXYGEN" && AC_MSG_ERROR([doxygen not found.]) ;;
+    no) DOXYGEN="" ;;
+    *)   AC_MSG_ERROR([Bad value ${withval} for --with-doxygen.]) ;;
+  esac])
+AM_CONDITIONAL([HAVE_DOXYGEN], [test -n "$DOXYGEN"])
+
+
 
 #----------------------------------------------------------------------------
 # Check for Operating System
@@ -140,6 +176,51 @@ case $host_os in
         AC_MSG_ERROR([Your platform is not currently supported])
         ;;
 esac
+
+
+
+#----------------------------------------------------------------------------
+# MPI checks
+#----------------------------------------------------------------------------
+# Do we have a useable MPI setup on the primary and/or secondary targets?
+# On Linux, by default, assumes mpicc and -m32/-m64
+# Note: this is a kludge in that it assumes the specified mpicc 
+# understands -m32/-m64 regardless of what is specified using
+# --with-mpicc=.
+MPI_CC="mpicc"
+
+
+
+AC_ARG_WITH(mpicc,
+  [AS_HELP_STRING([--with-mpicc=ARG], [use ARG as MPI-2 Compliant compiler.])],
+   MPI_CC=$withval
+)
+AC_SUBST(MPI_CC)
+
+
+
+## See if MPI_CC works 
+ac_mpi_found=no
+AC_MSG_CHECKING([for an MPI2-compliant C compiler and mpi.h])
+saved_CC=$CC
+OMPI_CC=gcc
+CC=$MPI_CC
+AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+#include <mpi.h>
+#include <stdio.h>
+]], [[
+  int ni, na, nd, comb;
+  int r = MPI_Init(NULL,NULL);
+  r |= MPI_Type_get_envelope( MPI_INT, &ni, &na, &nd, &comb );
+  r |= MPI_Finalize();
+  return r;
+]])], [
+AC_MSG_RESULT([yes, $MPI_CC])
+ac_mpi_found=yes
+], [
+AC_MSG_RESULT([no])
+])
+CC=$saved_CC
 
 
 
@@ -242,6 +323,21 @@ AC_MSG_RESULT([no])
 #
 # From here on, we enable/disable compile time switches for the simulator
 #----------------------------------------------------------------------------
+
+
+# Disable MPI. This can be used only on a single parallel machine
+
+AC_ARG_ENABLE([mpi],
+    AS_HELP_STRING([--disable-mpi], [Disable User-Level Threads for LP scheduling]))
+
+AS_IF([test "x$enable_mpi" != "xno"], [
+  if test "x$ac_mpi_found" = "xyes"
+  then
+	AC_DEFINE([HAVE_MPI])
+	ac_have_mpi=yes
+	CC=$MPI_CC
+  fi
+])
 
 
 # Disable ULT. Everything is run in the same context, in the same stack
@@ -491,6 +587,13 @@ else
 	ac_enable_ult="Disabled"
 fi
 
+# Compose the message regarding mpi
+if test x"$with_mpi" != xno
+then
+	enable_mpi="Enabled (compiler: $CC)"
+else
+	enable_mpi="Disable"
+fi
 
 # Compose the message regarding the Parallel Allocator
 if test "x$ac_have_parallel_allocator" = "xyes"
@@ -582,11 +685,24 @@ else
 		fi
 	else
 		ac_ecs="${ac_ecs} (requires linux)"
+  fi
+fi
+
+# Compose the message regarding MPI
+if test "x$ac_have_mpi" = "xyes"
+then
+	ac_mpi="Enabled using ${CC} (by default, use --disable-mpi if not wanted, --with-mpicc=ARG to change compiler)"
+else
+	ac_mpi="Disabled"
+	if test "x$ac_mpi_found" = "xno"
+	then
+		ac_mpi="${ac_mpi} (couldn't find/use the '${MPI_CC}' MPI compiler)"
+	else
+		ac_mpi="${ac_mpi} (disabled by the user)"
 	fi
 fi
 
 
-# Compose message to tell whether modules are disabled
 if test "x$ac_disable_modules" = "xyes"
 then
 	ac_modules="Kernel modules compilation/installation disabled"
@@ -609,6 +725,7 @@ cat<<EOF
 CPU Architecture.............. : ${current_cpu}
 Operating System.............. : ${host_os}
 Debugging Support............. : ${enable_debug}
+MPI........................... : ${enable_mpi}
 User-Level Threads............ : ${ac_enable_ult}
 Parallel Allocator............ : ${ac_parallel_allocator}
 NUMA Subsystem................ : ${numa_subsystem}
@@ -617,5 +734,8 @@ LP Rebinding.................. : ${ac_lp_rebinding}
 Event Cross State Management.. : ${ac_ecs}
 
 ${ac_modules}
+
+ROOT-Sim will be installed to: ${prefix}
+
 
 EOF

@@ -38,6 +38,7 @@
 #include <statistics/statistics.h>
 #include <gvt/gvt.h>
 #include <mm/dymelor.h>
+#include <communication/mpi.h>
 
 
 /// Barrier for all worker threads
@@ -148,11 +149,6 @@ void base_init(void) {
 		}
 	}
 
-	// TODO: questo va rimesso a posto quando ci rilanciamo sul distribuito
-	for (i = n_prc; i < n_prc_tot; i++) {
-		to_gid[i] = -1;
-	}
-
 	atexit(exit_from_simulation_model);
 }
 
@@ -251,6 +247,10 @@ void simulation_shutdown(int code) {
 		}
 
 		thread_barrier(&all_thread_barrier);
+
+		#ifdef HAVE_MPI
+		mpi_fini();
+		#endif
 	}
 
 	exit(code);

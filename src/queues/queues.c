@@ -40,6 +40,7 @@
 #include <mm/bh.h>
 #include <scheduler/scheduler.h>
 #include <communication/communication.h>
+#include <communication/gvt.h>
 #include <statistics/statistics.h>
 #include <gvt/gvt.h>
 
@@ -233,6 +234,9 @@ restart:
 							"sender: %d\n"
 							"receiver: %d\n"
 							"type: %d\n"
+							#ifdef HAS_MPI
+							"red_colored: %u\n"
+							#endif
 							"timestamp: %f\n"
 							"send time: %f\n"
 							"is antimessage %d\n"
@@ -241,6 +245,9 @@ restart:
 							msg_to_process->sender,
 							msg_to_process->receiver,
 							msg_to_process->type,
+							#ifdef HAS_MPI
+							msg_to_process->colour,
+							#endif
 							msg_to_process->timestamp,
 							msg_to_process->send_time,
 							msg_to_process->message_kind,
@@ -270,6 +277,9 @@ restart:
 
 						}
 
+#ifdef HAS_MPI
+						register_incoming_msg(msg_to_process);
+#endif
 						// Delete the matched message
 						list_delete_by_content(matched_msg->sender, LPS[lid_receiver]->queue_in, matched_msg);
 
@@ -296,7 +306,9 @@ restart:
               fflush(stdout);
 
 					}
-
+#ifdef HAS_MPI
+						register_incoming_msg(msg_to_process);
+#endif
 					break;
 
 				// It's a control message

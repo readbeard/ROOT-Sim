@@ -63,9 +63,7 @@
 #define MAX_LPs		16384		// This is 2^14
 
 /// Maximum event size (in bytes)
-//#define MAX_EVENT_SIZE	128
-#define MAX_EVENT_SIZE	600
-
+#define MAX_EVENT_SIZE	1120
 
 // XXX: this should be moved somewhere else...
 #define VERBOSE_INFO	1700
@@ -128,20 +126,29 @@
 
 typedef enum {positive, negative, control} message_kind_t;
 
+#ifdef HAS_MPI
+typedef unsigned char phase_colour;
+#endif
+
+/* The MPI datatype msg_mpi_t depends on the order of this struct. */
+
 /// Message Type definition
 typedef struct _msg_t {
 	// Kernel's information
 	unsigned int   		sender;
 	unsigned int   		receiver;
+#ifdef HAS_MPI
+	phase_colour	colour;
+#endif
 	int   			type;
+	message_kind_t		message_kind;
 	simtime_t		timestamp;
 	simtime_t		send_time;
-	message_kind_t		message_kind;
 	unsigned long long	mark;	/// Unique identifier of the message, used for antimessages
 	unsigned long long	rendezvous_mark;	/// Unique identifier of the message, used for rendez-vous events
 	// Application informations
-	char event_content[MAX_EVENT_SIZE];
 	int size;
+	char event_content[MAX_EVENT_SIZE];
 } msg_t;
 
 
