@@ -269,7 +269,7 @@ void process_bottom_halves(void) {
 						LPS[lid_receiver]->state = LP_STATE_ROLLBACK;
 					}
 #ifdef HAS_MPI
-						register_incoming_msg(msg_to_process);
+					register_incoming_msg(msg_to_process);
 #endif
 					break;
 
