@@ -484,27 +484,26 @@ void schedule(void) {
 
 	// No logical process found with events to be processed
 	if (lid == IDLE_PROCESS) {
-		statistics_post_lp_data(lid, STAT_IDLE_CYCLES, 1.0);
-      		return;
+      statistics_post_lp_data(lid, STAT_IDLE_CYCLES, 1.0);
+      return;
     	}
 
 
 	// If we have to rollback
-    	if(LPS[lid]->state == LP_STATE_ROLLBACK) {
-		rollback(lid);
+  if(LPS[lid]->state == LP_STATE_ROLLBACK) {
+    rollback(lid);
+    LPS[lid]->state = LP_STATE_READY;
+    send_outgoing_msgs(lid);
 
-		LPS[lid]->state = LP_STATE_READY;
-		send_outgoing_msgs(lid);
+    return;
+  }
 
-		return;
-	}
-
-	if(!is_blocked_state(LPS[lid]->state) && LPS[lid]->state != LP_STATE_READY_FOR_SYNCH){
-		event = advance_to_next_event(lid);
-	}
-	else {
-		event = LPS[lid]->bound;
-	}
+  if(!is_blocked_state(LPS[lid]->state) && LPS[lid]->state != LP_STATE_READY_FOR_SYNCH){
+    event = advance_to_next_event(lid);
+  }
+  else {
+    event = LPS[lid]->bound;
+  }
 
 
 	// Sanity check: if we get here, it means that lid is a LP which has
@@ -522,10 +521,12 @@ void schedule(void) {
 	state = LPS[lid]->current_base_pointer;
 
 	#ifdef HAVE_CROSS_STATE
+
 	// In case we are resuming an interrupted execution, we keep track of this.
 	// If at the end of the scheduling the LP is not blocked, we can unblokc all the remote objects
-	if(LPS[lid]->state == LP_STATE_READY_FOR_SYNCH) {
-		resume_execution = true;
+	//if(LPS[lid]->state == LP_STATE_READY_FOR_SYNCH) {
+	if(is_blocked_state(LPS[lid]->state)) { // == LP_STATE_READY_FOR_SYNCH) {
+    resume_execution = true;
 	}
 	#endif
 

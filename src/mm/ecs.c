@@ -40,9 +40,11 @@
 
 
 #include <core/core.h>
+#include <core/timer.h>
 //#include <mm/malloc.h>
 //#include <mm/allocator.h> COMMENTED BY MATTEO
 #include <mm/dymelor.h>
+#include <mm/mm.h>
 #include <scheduler/scheduler.h>
 #include <scheduler/process.h>
 #include <arch/ult.h>
@@ -116,7 +118,8 @@ void ECS(long long ds, unsigned long long hitted_object){
 //	fprintf(stdout, "placing a START message in output queue from %d to %d at %f sendtime %f mark %llu rendezvous %llu\n",
 //			msg_hdr.sender, msg_hdr.receiver, msg_hdr.timestamp, msg_hdr.send_time, msg_hdr.mark, msg_hdr.rendezvous_mark
 //		);
-
+	/*fprintf(stdout, "placing a START message in output queue from %d to %d at %f sendtime %f mark %llu rendezvous %llu\n",
+*/
 
 	// Block the execution of this LP
 	LPS[current_lp]->state = LP_STATE_WAIT_FOR_SYNCH;
@@ -139,25 +142,28 @@ void ECS(long long ds, unsigned long long hitted_object){
 // inserire qui tutte le api di schedulazione/deschedulazione
 
 void lp_alloc_thread_init(void) {
+	void* ptr;
+	ioctl_fd = open("/dev/ktblmgr", O_RDONLY);
+	if (ioctl_fd == -1) {
+		rootsim_error(true, "Error in opening special device file. ROOT-Sim is compiled for using the ktblmgr linux kernel module, which seems to be not loaded.");
+	}
 
-        ioctl_fd = open("/dev/ktblmgr", O_RDONLY);
-        if (ioctl_fd == -1) {
-                rootsim_error(true, "Error in opening special device file. ROOT-Sim is compiled for using the ktblmgr linux kernel module, which seems to be not loaded.");
-        }
+	ioctl(ioctl_fd, IOCTL_SET_ANCESTOR_PGD);  //ioctl call
+	lp_memory_ioctl_info.ds = -1;
+	ptr = get_base_pointer(0); // LP 0 is the first allocated one, and it's memory stock starts from the beginning of the PML4
+	lp_memory_ioctl_info.addr = ptr;
+	lp_memory_ioctl_info.mapped_processes = n_prc;
 
-        ioctl(ioctl_fd, IOCTL_SET_ANCESTOR_PGD);  //ioctl call
+	callback_function =  rootsim_cross_state_dependency_handler;
+	lp_memory_ioctl_info.callback = callback_function;
 
-        lp_memory_ioctl_info.ds = -1;
-        lp_memory_ioctl_info.addr = get_base_pointer(0); // LP 0 is the first allocated one, and it's memory stock starts from the beginning of the PML4
-        lp_memory_ioctl_info.mapped_processes = n_prc;
+	// TODO: this function is called by each worker thread. Does calling SET_VM_RANGE cause
+	// a memory leak into kernel space?
 
-        callback_function =  rootsim_cross_state_dependency_handler;
-        lp_memory_ioctl_info.callback = callback_function;
+	ioctl(ioctl_fd, IOCTL_SET_VM_RANGE, &lp_memory_ioctl_info);
 
-        ioctl(ioctl_fd, IOCTL_SET_VM_RANGE, &lp_memory_ioctl_info);
-
-      	/* required to manage the per-thread memory view */
-      	pgd_ds = ioctl(ioctl_fd, IOCTL_GET_PGD);  //ioctl call
+	/* required to manage the per-thread memory view */
+	pgd_ds = ioctl(ioctl_fd, IOCTL_GET_PGD);  //ioctl call
 }
 
 /* void lp_alloc_schedule(void) { */
@@ -189,6 +195,7 @@ void lp_alloc_thread_init(void) {
 void lp_alloc_schedule(void) {
 
 	ioctl_info sched_info;
+  bzero(&sched_info, sizeof(ioctl_info));
 	
 	sched_info.ds = pgd_ds; // this is current
 	sched_info.count = LPS[current_lp]->ECS_index + 1; // it's a counter

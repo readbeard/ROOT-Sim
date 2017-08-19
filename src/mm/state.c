@@ -233,6 +233,8 @@ void rollback(unsigned int lid) {
 	reprocessed_events = silent_execution(lid, LPS[lid]->current_base_pointer, last_restored_event, last_correct_event);
 	statistics_post_lp_data(lid, STAT_SILENT, (double)reprocessed_events);
 
+  // TODO: silent execution resets the LP state to the previous
+  // value, so it should be the last function to be called within rollback()
 	// Control messages must be rolled back as well
 	rollback_control_message(lid, last_correct_event->timestamp);
 }

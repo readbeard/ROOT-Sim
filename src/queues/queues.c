@@ -212,7 +212,7 @@ restart:
 
 					if(matched_msg == NULL) {
 						rootsim_error(false, "LP %d Received an antimessage with mark %llu at LP %u from LP %u, but no such mark found in the input queue!\n", LPS_bound[i]->lid, msg_to_process->mark, msg_to_process->receiver, msg_to_process->sender);
-						printf("Message Content:"
+						/*printf("Message Content:"
 							"sender: %d\n"
 							"receiver: %d\n"
 							"type: %d\n"
@@ -235,7 +235,7 @@ restart:
 							msg_to_process->message_kind,
 							msg_to_process->mark,
 							msg_to_process->rendezvous_mark);
-						fflush(stdout);
+						fflush(stdout);*/
 						abort();
 					} else {
 
@@ -289,7 +289,7 @@ restart:
 					break;
 
 				// It's a control message
-				case other:
+				case control:
 
 					// Check if it is an anti control message
 					if(!anti_control_message(msg_to_process)) {
