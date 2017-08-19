@@ -45,7 +45,10 @@ librootsim_a_SOURCES =	main.c \
 			gvt/fossil.c \
 			gvt/ccgs.c \
 			communication/window.c \
-			communication/communication.c
+			communication/wnd.c\
+			communication/communication.c\
+			communication/gvt.c\
+			communication/mpi.c
 
 libwrapperl_a_SOURCES = lib-wrapper/wrapper.c
 
