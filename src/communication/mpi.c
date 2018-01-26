@@ -96,8 +96,7 @@ void send_remote_msg(msg_t *msg){
 	out_msg->msg->colour = threads_phase_colour[local_tid];
 	unsigned int dest = GidToKernel(msg->receiver);
 
-	if(count_as_white(msg->type)) 
-		register_outgoing_msg(out_msg->msg);
+	register_outgoing_msg(out_msg->msg);
 
 	// Check if the message buffer is from the slab. In this case
 	// we can send it using the msg_mpi_t. On the other hand, we need
