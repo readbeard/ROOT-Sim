@@ -131,13 +131,13 @@ void ProcessEvent(unsigned int me, simtime_t now, unsigned int event, void *cont
 					if(i != agent->id && BITMAP_CHECK_BIT(region->agents, i)) {
 						other_agent = agents[i];
 
-						for(j = 0; j < get_tot_agents(); j++) {
-							if(BITMAP_CHECK_BIT(agent->map, j) == 0 && BITMAP_CHECK_BIT(agent->map, j) == 1) {
+						for(j = 0; j < get_tot_regions(); j++) {
+							if(BITMAP_CHECK_BIT(agent->map, j) == 0 && BITMAP_CHECK_BIT(other_agent->map, j) >= 1) {
 								// Copy from other to me
 								BITMAP_SET_BIT(agent->map, j);
 								agent->exploration[j] = other_agent->exploration[j];
 								
-							} else if(BITMAP_CHECK_BIT(agent->map, j) == 1 && BITMAP_CHECK_BIT(agent->map, j) == 0) {
+							} else if(BITMAP_CHECK_BIT(agent->map, j) >= 1 && BITMAP_CHECK_BIT(other_agent->map, j) == 0) {
 								// Copy from me to other
 								BITMAP_SET_BIT(other_agent->map, j);
 								other_agent->exploration[j] = agent->exploration[j];
