@@ -1,10 +1,39 @@
+/**
+* @file lib/topology.c
+*
+* @brief Topology Library
+*
+* Topology Library
+*
+* @copyright
+* Copyright (C) 2008-2018 HPDCS Group
+* https://hpdcs.github.io
+*
+* This file is part of ROOT-Sim (ROme OpTimistic Simulator).
+*
+* ROOT-Sim is free software; you can redistribute it and/or modify it under the
+* terms of the GNU General Public License as published by the Free Software
+* Foundation; only version 3 of the License applies.
+*
+* ROOT-Sim is distributed in the hope that it will be useful, but WITHOUT ANY
+* WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+* A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License along with
+* ROOT-Sim; if not, write to the Free Software Foundation, Inc.,
+* 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+*
+* @author Alessandro Pellegrini
+*/
+
 #include <ROOT-Sim.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdarg.h>
 #include <math.h>
 #include <scheduler/scheduler.h>
-#include <mm/dymelor.h>
+#include <mm/mm.h>
 
 static bool first_call = true;
 static unsigned int edge; // Don't recompute every time the square root
@@ -18,19 +47,19 @@ unsigned int FindReceiver(int topology) {
 	unsigned int x, y, nx, ny;
 	int direction;
 	GID_t receiver;
-	GID_t sender = LidToGid(current_lp);
+	GID_t sender = current->gid;
 
 	switch_to_platform_mode();
 
 
-	if(first_call) {
+	if(unlikely(first_call)) {
 		edge = sqrt(n_prc_tot);
 		first_call = false;
 	}
 
 
 	// Very simple case!
-	if(n_prc_tot == 1) {
+	if(unlikely(n_prc_tot == 1)) {
 		receiver = sender;
 		goto out;
 	}
@@ -39,14 +68,14 @@ unsigned int FindReceiver(int topology) {
 
 		case TOPOLOGY_HEXAGON:
 			// Sanity check!
-			if(edge * edge != n_prc_tot) {
+			if(unlikely(edge * edge != n_prc_tot)) {
 				rootsim_error(true, "Hexagonal map wrongly specified!\n");
 				return 0;
 			}
 
 			// Convert linear coords to hexagonal coords
-			x = gid_to_int(sender) % edge;
-			y = gid_to_int(sender) / edge;
+			x = sender.to_int % edge;
+			y = sender.to_int / edge;
 
 
 			// Find a random neighbour
@@ -80,7 +109,7 @@ unsigned int FindReceiver(int topology) {
 						ny = y;
 						break;
 					default:
-						rootsim_error(true, "Met an impossible condition at %s:%d. Aborting...\n", __FILE__, __LINE__);
+						rootsim_error(true, "Met an impossible condition. Aborting...\n");
 				}
 
 			// We don't check is nx < 0 || ny < 0, as they are unsigned and therefore overflow
@@ -94,20 +123,20 @@ unsigned int FindReceiver(int topology) {
 
 		case TOPOLOGY_SQUARE:
 			// Sanity check!
-			if(edge * edge != n_prc_tot) {
+			if(unlikely(edge * edge != n_prc_tot)) {
 				rootsim_error(true, "Hexagonal map wrongly specified!\n");
 				return 0;
 			}
 
 			// Convert linear coords to square coords
-			x = gid_to_int(sender) % edge;
-			y = gid_to_int(sender) / edge;
+			x = sender.to_int % edge;
+			y = sender.to_int / edge;
 
 			// Find a random neighbour
 			do {
 
 				direction = 4 * Random();
-				if(direction == 4) {
+				if(unlikely(direction == 4)) {
 					direction = 3;
 				}
 
@@ -129,7 +158,7 @@ unsigned int FindReceiver(int topology) {
 						ny = y;
 						break;
 					default:
-						rootsim_error(true, "Met an impossible condition at %s:%d. Aborting...\n", __FILE__, __LINE__);
+						rootsim_error(true, "Met an impossible condition. Aborting...\n");
 				}
 
 			// We don't check is nx < 0 || ny < 0, as they are unsigned and therefore overflow
@@ -142,17 +171,17 @@ unsigned int FindReceiver(int topology) {
 
 		case TOPOLOGY_TORUS:
 			// Sanity check!
-			if(edge * edge != n_prc_tot) {
+			if(unlikely(edge * edge != n_prc_tot)) {
 				rootsim_error(true, "Hexagonal map wrongly specified!\n");
 				return 0;
 			}
 
 			// Convert linear coords to square coords
-			x = gid_to_int(sender) % edge;
-			y = gid_to_int(sender) / edge;
+			x = sender.to_int % edge;
+			y = sender.to_int / edge;
 
 			direction = 4 * Random();
-			if(direction == 4) {
+			if(unlikely(direction == 4)) {
 				direction = 3;
 			}
 
@@ -174,7 +203,7 @@ unsigned int FindReceiver(int topology) {
 					ny = y;
 					break;
 				default:
-					rootsim_error(true, "Met an impossible condition at %s:%d. Aborting...\n", __FILE__, __LINE__);
+					rootsim_error(true, "Met an impossible condition. Aborting...\n");
 			}
 
 			// Check for wrapping around
@@ -202,15 +231,15 @@ unsigned int FindReceiver(int topology) {
 			u = Random();
 
 			if (u < 0.5) {
-				if(gid_to_int(sender) == 0) {
+				if(sender.to_int == 0) {
 					set_gid(receiver, n_prc_tot - 1);
 				} else {
-					set_gid(receiver, gid_to_int(sender) - 1);
+					set_gid(receiver, sender.to_int - 1);
 				}
 			} else {
-				set_gid(receiver, gid_to_int(sender) + 1);
+				set_gid(receiver, sender.to_int + 1);
 
-				if (gid_to_int(sender) == n_prc_tot) {
+				if (sender.to_int == n_prc_tot) {
 					set_gid(receiver, 0);
 				}
 			}
@@ -221,9 +250,9 @@ unsigned int FindReceiver(int topology) {
 
 		case TOPOLOGY_RING:
 
-			set_gid(receiver, gid_to_int(sender) + 1);
+			set_gid(receiver, sender.to_int + 1);
 
-			if (gid_to_int(receiver) == n_prc_tot) {
+			if (receiver.to_int == n_prc_tot) {
 				set_gid(receiver, 0);
 			}
 
@@ -232,10 +261,10 @@ unsigned int FindReceiver(int topology) {
 
 		case TOPOLOGY_STAR:
 
-			if (gid_to_int(sender) == 0) {
+			if (sender.to_int == 0) {
 				do {
 					set_gid(receiver, (unsigned int)(n_prc_tot * Random()));
-				} while(gid_to_int(receiver) == n_prc_tot);
+				} while(receiver.to_int == n_prc_tot);
 			} else {
 				set_gid(receiver, 0);
 			}
@@ -248,7 +277,7 @@ unsigned int FindReceiver(int topology) {
 
     out:
 	switch_to_application_mode();
-	return gid_to_int(receiver);
+	return receiver.to_int;
 
 }
 
@@ -261,23 +290,23 @@ unsigned int GetReceiver(int topology, int direction) {
 
 	switch_to_platform_mode();
 
-	sender = LidToGid(current_lp);
+	sender = current->gid;
 	set_gid(receiver, INVALID_DIRECTION);
 
-	if(first_call) {
+	if(unlikely(first_call)) {
 		first_call = false;
 
 		edge = sqrt(n_prc_tot);
 		// Sanity check!
-		if(edge * edge != n_prc_tot) {
+		if(unlikely(edge * edge != n_prc_tot)) {
 			rootsim_error(true, "Hexagonal map wrongly specified!\n");
 			return 0;
 		}
 	}
 
 	// Convert linear coords to square coords
-	x = gid_to_int(sender) % edge;
-	y = gid_to_int(sender) / edge;
+	x = sender.to_int % edge;
+	y = sender.to_int / edge;
 
 	switch(topology) {
 
@@ -312,7 +341,7 @@ unsigned int GetReceiver(int topology, int direction) {
 					goto out;
 			}
 
-			if(nx >= edge || ny >= edge)
+			if(unlikely(nx >= edge || ny >= edge))
 				set_gid(receiver, INVALID_DIRECTION);
 			else
 				set_gid(receiver, ny * edge + nx);
@@ -343,7 +372,7 @@ unsigned int GetReceiver(int topology, int direction) {
 					goto out;
 			}
 
-			if(nx >= edge || ny >= edge)
+			if(unlikely(x >= edge || ny >= edge))
 				set_gid(receiver, INVALID_DIRECTION);
 			else
 				set_gid(receiver, ny * edge + nx);
@@ -387,16 +416,16 @@ unsigned int GetReceiver(int topology, int direction) {
 		case TOPOLOGY_BIDRING:
 
 			if(direction == DIRECTION_W)
-				set_gid(receiver, gid_to_int(sender) - 1);
+				set_gid(receiver, sender.to_int - 1);
 			else if(direction == DIRECTION_E)
-				set_gid(receiver, gid_to_int(sender) + 1);
+				set_gid(receiver, sender.to_int + 1);
 			else
 				goto out;
 
-   			if (gid_to_int(receiver) == UINT_MAX) {
+			if (receiver.to_int == UINT_MAX) {
 				set_gid(receiver, n_prc_tot - 1);
 			}
-			if (gid_to_int(receiver) == n_prc_tot) {
+			if (receiver.to_int == n_prc_tot) {
 				set_gid(receiver, 0);
 			}
 
@@ -406,11 +435,11 @@ unsigned int GetReceiver(int topology, int direction) {
 		case TOPOLOGY_RING:
 
 			if(direction == DIRECTION_E)
-				set_gid(receiver, gid_to_int(sender) + 1);
+				set_gid(receiver, sender.to_int + 1);
 			else
 				goto out;
 
-			if (gid_to_int(receiver) == n_prc_tot) {
+			if (receiver.to_int == n_prc_tot) {
 				set_gid(receiver, 0);
 			}
 
@@ -419,6 +448,161 @@ unsigned int GetReceiver(int topology, int direction) {
 
     out:
 	switch_to_application_mode();
-	return gid_to_int(receiver);
+	return receiver.to_int;
 
 }
+
+// TODO: again, we should have a generic bitmap type in the simulator.
+#define NUM_CHUNKS_PER_BLOCK 32
+
+#define SET_BIT_AT(B, K) ( B |= (MASK << K) )
+#define CHECK_BIT_AT(B, K) ( B & (MASK << K) )
+
+#define CHECK_BIT(A, I) CHECK_BIT_AT((A)[(int)(I / NUM_CHUNKS_PER_BLOCK)], ((int)I % NUM_CHUNKS_PER_BLOCK))
+#define SET_BIT(A, I) SET_BIT_AT((A)[(int)(I / NUM_CHUNKS_PER_BLOCK)], ((int)I % NUM_CHUNKS_PER_BLOCK))
+
+void SetupObstacles(obstacles_t **obstacles)  {
+	int bitmap_blocks;
+
+	*obstacles = NULL;
+
+	// Valid only for square regions
+	if(unlikely(first_call)) {
+		edge = sqrt(n_prc_tot);
+		first_call = false;
+	}
+	if(unlikely(edge * edge != n_prc_tot)) {
+		rootsim_error(true, "Hexagonal map wrongly specified!\n");
+		return;
+	}
+
+	// Allocate a bitmap
+	bitmap_blocks = n_prc_tot / NUM_CHUNKS_PER_BLOCK;
+	if(bitmap_blocks < 1)
+		bitmap_blocks = 1;
+	*obstacles = __wrap_malloc(sizeof(obstacles_t) + sizeof(unsigned int) * bitmap_blocks);
+	(*obstacles)->size = n_prc_tot;
+}
+
+void AddObstacles(obstacles_t *obstacles, int num, ...)  {
+	va_list args;
+	int i, cell;
+
+	// Process variadic arguments
+	va_start(args, num);
+
+	for(i = 0; i < num; i++) {
+		// Get the next cell to be set as an obstacle and set
+		// it into the bitmap
+		cell = va_arg(args, int);
+		SET_BIT(obstacles->grid, cell);
+	}
+
+	va_end(args);
+}
+
+void AddObstacle(obstacles_t *obstacles, int cell)  {
+	SET_BIT(obstacles->grid, cell);
+}
+
+void DiscardObstacles(obstacles_t *obstacles) {
+	__wrap_free(obstacles);
+}
+
+typedef struct _astar_t {
+	unsigned int num_steps;
+	unsigned int *list;
+} astar_t;
+
+
+static int compare_astar(const void *a, const void *b) {
+	return (int)(((astar_t *)a)->num_steps - ((astar_t *)b)->num_steps);
+}
+
+static astar_t a_star(unsigned int *a_star_bitmap, int topology, unsigned int current_cell, unsigned int dest, unsigned int step, obstacles_t *obstacles) {
+	unsigned int i;
+	unsigned int tentative_cell;
+
+	astar_t states[8] = { [0 ... 7] = { UINT_MAX, NULL } };
+
+	// TODO: again, we need a generic bitmap type in ROOT-Sim
+	unsigned int tentative_a_star_bitmap[n_prc_tot / NUM_CHUNKS_PER_BLOCK + 1];
+
+	// Is this the target?
+	if (current_cell == dest) {
+		states[0].list = rsalloc(sizeof(unsigned int) * step);
+		states[0].list[step - 1] = current_cell;
+		states[0].num_steps = step;
+		return states[0];
+	}
+
+	// We have visited this cell
+	SET_BIT(a_star_bitmap, current_cell);
+
+	// Scan all possible neighbours depending on the actual topology
+	for(i = 0; i < (topology == TOPOLOGY_SQUARE ? 4 : 8); i++) {
+		tentative_cell = GetReceiver(TOPOLOGY_HEXAGON, i);
+
+		// Try all reachable unvisited cells
+		if(tentative_cell == INVALID_DIRECTION || CHECK_BIT(a_star_bitmap, tentative_cell) || CHECK_BIT(obstacles->grid, tentative_cell))
+			continue;
+
+		// Get closer to the destination
+		memcpy(tentative_a_star_bitmap, a_star_bitmap, sizeof(unsigned int) * (n_prc_tot / NUM_CHUNKS_PER_BLOCK + 1));
+		states[i] = a_star(tentative_a_star_bitmap, topology, tentative_cell, dest, step + 1, obstacles);
+	}
+
+	// Pick the state with the minimum distance
+	qsort(states, (topology == TOPOLOGY_SQUARE ? 4 : 8), sizeof(astar_t), compare_astar);
+
+	// Free unneeded states
+	for(i = 1; i < (topology == TOPOLOGY_SQUARE ? 4 : 8); i++) {
+		if(states[i].list != NULL) {
+			rsfree(states[i].list);
+		}
+	}
+
+	// Register me in the 0-th state's list
+	states[0].list[step - 1] = current_cell;
+
+	return states[0];
+}
+
+
+unsigned int ComputeMinTour(unsigned int **list, obstacles_t *obstacles, int topology, unsigned int source, unsigned int dest) {
+	astar_t solution;
+
+	// TODO: again, we need a generic bitmap type in ROOT-Sim
+	unsigned int a_star_bitmap[n_prc_tot / NUM_CHUNKS_PER_BLOCK + 1];
+	bzero(a_star_bitmap, sizeof(unsigned int) * (n_prc_tot / NUM_CHUNKS_PER_BLOCK + 1));
+
+	// Sanity checks
+	if(topology != TOPOLOGY_HEXAGON && topology != TOPOLOGY_SQUARE) {
+		rootsim_error(true, "Invalid topology passed to ComputeMinTour().\n");
+		return UINT_MAX;
+	}
+	if(source >= n_prc_tot) {
+		rootsim_error(true, "Invalid source passed to ComputeMinTour(): %u.\n", source);
+		return UINT_MAX;
+	}
+	if(dest >= n_prc_tot) {
+		rootsim_error(true, "Invalid destination passed to ComputeMinTour(): %u.\n", dest);
+		return UINT_MAX;
+	}
+	if(source == dest) {
+		rootsim_error(true, "Asking ComputeMinTour() to find a path from a source equal to the destination\n");
+		return UINT_MAX;
+	}
+
+	*list = NULL;
+	solution = a_star(a_star_bitmap, topology, source, dest, 0, obstacles);
+
+	if(solution.num_steps != UINT_MAX) {
+		*list = __wrap_malloc(sizeof(unsigned int) * solution.num_steps);
+		memcpy(*list, solution.list, sizeof(unsigned int) * solution.num_steps);
+	}
+	rsfree(solution.list);
+
+	return solution.num_steps;
+}
+

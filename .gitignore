@@ -8,9 +8,18 @@
 *.so.*
 *.dylib
 *.out
+*.gcno
+*.gcda
+*.gcov
+
+model
+
+html/
 
 Makefile
 Makefile.in
+
+asm_defines.h
 
 /aclocal.m4
 /autom4te.cache/
@@ -49,3 +58,6 @@ modules.order
 *.ko.cmd
 *.mod.c
 .tmp_versions
+
+/dymelor
+/numerical

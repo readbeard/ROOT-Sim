@@ -80,7 +80,7 @@ void ProcessEvent(unsigned int me, simtime_t now, int event_type, event_content_
 			if(state->residual_tx_ops > 0) {
 
 				ScheduleNewEvent(me, timestamp, TX_OP, NULL, 0);
-				state->read_set[state->tx_ops_displacement] = RandomRange(10,10000); 
+				state->read_set[state->tx_ops_displacement] = RandomRange(10,10000);
 				for(i=0;i<state->tx_ops_displacement;i++){
 						if (state->read_set[i] != state->read_set[state->tx_ops_displacement]);
 						//found conflicting item
@@ -132,6 +132,7 @@ void ProcessEvent(unsigned int me, simtime_t now, int event_type, event_content_
 			break;
 
         	case PREPARE:
+
 			for(i = 0; i < event_content->size; i++) {
 				#ifdef ECS
 				target = event_content->read_set_ptr[i];
@@ -145,6 +146,7 @@ void ProcessEvent(unsigned int me, simtime_t now, int event_type, event_content_
 			#ifdef ECS
 			memset((void*)event_content->read_set_ptr,0,sizeof(int)*MAX_RS_SIZE);
 			#endif
+
 			timestamp= now + (simtime_t)Expent(50);
 
 			if(event_content->second) {
@@ -154,6 +156,7 @@ void ProcessEvent(unsigned int me, simtime_t now, int event_type, event_content_
 				new_event_content.second = false;
 			}
 //			ScheduleNewEvent(event_content->from, timestamp, COMMIT, &event_content, sizeof(new_event_content));
+			// wasn't in develop originally			
 			timestamp= now + (simtime_t)Expent(50);
 			ScheduleNewEvent(me, timestamp, COMMIT, &event_content, sizeof(new_event_content));
 //
